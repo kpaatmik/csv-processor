@@ -4,6 +4,9 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.kpaatmik.csv_processing_system.dto.HeaderMapping;
+import com.kpaatmik.csv_processing_system.exception.HeaderValidationException;
+
 @Service
 public class HeaderValidator {
 
@@ -56,28 +59,28 @@ public class HeaderValidator {
 
         // Email is mandatory
         if (email == null) {
-            throw new IllegalArgumentException(
+            throw new HeaderValidationException(
                     "CSV must contain an email column"
             );
         }
 
         // ZIP code is mandatory
         if (zipCode == null) {
-            throw new IllegalArgumentException(
+            throw new HeaderValidationException(
                     "CSV must contain a ZIP code column"
             );
         }
 
         // At least one name column
         if (firstName == null && lastName == null) {
-            throw new IllegalArgumentException(
+            throw new HeaderValidationException(
                     "CSV must contain either first name or last name"
             );
         }
 
         // At least one phone column
         if (phone1 == null && phone2 == null) {
-            throw new IllegalArgumentException(
+            throw new HeaderValidationException(
                     "CSV must contain either phone1 or phone2"
             );
         }

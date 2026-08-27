@@ -1,5 +1,6 @@
 package com.kpaatmik.csv_processing_system.service;
 
+import com.kpaatmik.csv_processing_system.dto.HeaderMapping;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 
@@ -28,50 +29,35 @@ public class RecordValidator {
         String phone2 =
                 getValue(record, mapping.phone2Column());
 
-        // Name validation
         if (isBlank(firstName) && isBlank(lastName)) {
             throw new IllegalArgumentException(
-                    "Record " + record.getRecordNumber()
-                    + ": First name or last name is required"
+                    "First name or last name is required"
             );
         }
 
-        // Email validation
         if (isBlank(email)) {
             throw new IllegalArgumentException(
-                    "Record " + record.getRecordNumber()
-                    + ": Email is required"
+                    "Email is required"
             );
         }
 
         if (!isValidEmail(email)) {
             throw new IllegalArgumentException(
-                    "Record " + record.getRecordNumber()
-                    + ": Invalid email"
+                    "Invalid email"
             );
         }
 
-        // ZIP validation
         if (isBlank(zipCode)) {
             throw new IllegalArgumentException(
-                    "Record " + record.getRecordNumber()
-                    + ": ZIP code is required"
+                    "ZIP code is required"
             );
         }
 
-        // Phone validation
         if (isBlank(phone1) && isBlank(phone2)) {
             throw new IllegalArgumentException(
-                    "Record " + record.getRecordNumber()
-                    + ": Phone1 or Phone2 is required"
+                    "Phone1 or Phone2 is required"
             );
         }
-
-        System.out.println(
-                "Record "
-                + record.getRecordNumber()
-                + " is valid"
-        );
     }
 
     private String getValue(
@@ -88,7 +74,6 @@ public class RecordValidator {
     }
 
     private boolean isBlank(String value) {
-
         return value == null || value.isBlank();
     }
 

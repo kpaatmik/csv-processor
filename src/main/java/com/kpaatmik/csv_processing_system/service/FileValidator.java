@@ -3,6 +3,8 @@ package com.kpaatmik.csv_processing_system.service;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.kpaatmik.csv_processing_system.exception.InvalidFileException;
+
 @Service
 public class FileValidator {
 
@@ -19,7 +21,7 @@ public class FileValidator {
     private void validateFileExists(MultipartFile file) {
 
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException(
+            throw new InvalidFileException(
                     "File is empty or not provided"
             );
         }
@@ -30,13 +32,13 @@ public class FileValidator {
         String fileName = file.getOriginalFilename();
 
         if (fileName == null || fileName.isBlank()) {
-            throw new IllegalArgumentException(
+            throw new InvalidFileException(
                     "File name is missing"
             );
         }
 
         if (!fileName.toLowerCase().endsWith(CSV_EXTENSION)) {
-            throw new IllegalArgumentException(
+            throw new InvalidFileException(
                     "Invalid file format. Only CSV files are supported"
             );
         }
@@ -49,7 +51,7 @@ public class FileValidator {
         if (contentType == null ||
                 !contentType.equalsIgnoreCase(CSV_CONTENT_TYPE)) {
 
-            throw new IllegalArgumentException(
+            throw new InvalidFileException(
                     "Invalid file type. Only CSV files are supported"
             );
         }
