@@ -291,12 +291,13 @@ public class RecordProcessingService {
     }
     
     
-    private ErrorType determineErrorType(
-            Exception e) {
+    private ErrorType determineErrorType(Exception e) {
 
         if (e instanceof RecordValidationException) {
             return ErrorType.RECORD_VALIDATION;
         }
+
+     
 
         if (e instanceof ZipCodeApiException) {
             return ErrorType.ZIP_API;
