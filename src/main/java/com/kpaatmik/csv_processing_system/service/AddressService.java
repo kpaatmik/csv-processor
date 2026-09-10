@@ -1,11 +1,7 @@
 package com.kpaatmik.csv_processing_system.service;
 
-import com.kpaatmik.csv_processing_system.entity.Address;
 import com.kpaatmik.csv_processing_system.exception.AddressResolutionException;
-import com.kpaatmik.csv_processing_system.repo.AddressRepository;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
 
 @Service
@@ -13,23 +9,23 @@ import org.springframework.stereotype.Service;
 public class AddressService {
 
     private final AddressCache addressCache;
-    private final AddressRepository addressRepository;
 
-    public Address resolveAddress(String zipCode) {
+    public Long resolveAddressId(String zipCode) {
 
         try {
 
             Long addressId =
                     addressCache.get(zipCode);
 
-            return addressRepository
-                    .findById(addressId)
-                    .orElseThrow(() ->
-                            new AddressResolutionException(
-                                    "Address could not be found for ZIP code: "
-                                            + zipCode
-                            )
-                    );
+            if (addressId == null) {
+
+                throw new AddressResolutionException(
+                        "Address ID not found for ZIP code: "
+                                + zipCode
+                );
+            }
+
+            return addressId;
 
         } catch (AddressResolutionException e) {
 

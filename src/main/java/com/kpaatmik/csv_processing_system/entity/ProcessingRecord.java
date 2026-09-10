@@ -13,7 +13,15 @@ import lombok.*;
 public class ProcessingRecord {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "processing_record_seq_gen"
+    )
+    @SequenceGenerator(
+            name = "processing_record_seq_gen",
+            sequenceName = "processing_record_seq",
+            allocationSize = 500
+    )
     private Long id;
 
     @Column(nullable = false)
@@ -22,8 +30,7 @@ public class ProcessingRecord {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RecordStatus status;
-    
-    
+
     @Enumerated(EnumType.STRING)
     private ErrorType errorType;
 

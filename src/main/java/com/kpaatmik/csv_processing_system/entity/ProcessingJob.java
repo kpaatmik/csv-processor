@@ -17,7 +17,15 @@ import java.util.List;
 public class ProcessingJob {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "processing_job_seq_gen"
+    )
+    @SequenceGenerator(
+            name = "processing_job_seq_gen",
+            sequenceName = "processing_job_seq",
+            allocationSize = 500
+    )
     private Long id;
 
     @Column(nullable = false)

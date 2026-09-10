@@ -21,7 +21,15 @@ import lombok.*;
 public class Address {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "address_seq_gen"
+    )
+    @SequenceGenerator(
+            name = "address_seq_gen",
+            sequenceName = "address_seq",
+            allocationSize = 500
+    )
     private Long id;
 
     @Column(
