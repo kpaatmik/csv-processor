@@ -27,9 +27,7 @@ public class BatchPersistenceService {
             List<UserPersistenceItem> userItems,
             List<ProcessingRecord> processingRecords) {
 
-        // ------------------------------------------------
-        // 1. Create User entities
-        // ------------------------------------------------
+//        long start = System.currentTimeMillis();
 
         List<User> users =
                 new ArrayList<>(userItems.size());
@@ -44,49 +42,51 @@ public class BatchPersistenceService {
 
             User user =
                     User.builder()
-                            .firstName(
-                                    item.userData().firstName()
-                            )
-                            .lastName(
-                                    item.userData().lastName()
-                            )
-                            .email(
-                                    item.userData().email()
-                            )
-                            .phone(
-                                    item.userData().phone()
-                            )
+                            .firstName(item.userData().firstName())
+                            .lastName(item.userData().lastName())
+                            .email(item.userData().email())
+                            .phone(item.userData().phone())
                             .address(address)
                             .build();
 
             users.add(user);
         }
 
-        // ------------------------------------------------
-        // 2. Batch save users
-        // ------------------------------------------------
+//        long entityCreationTime =
+//                System.currentTimeMillis();
 
         if (!users.isEmpty()) {
-
             userRepository.saveAll(users);
         }
 
-        // ------------------------------------------------
-        // 3. Batch save processing records
-        // ------------------------------------------------
+//        long userSaveTime =
+//                System.currentTimeMillis();
 
         if (!processingRecords.isEmpty()) {
-
             processingRecordRepository.saveAll(
                     processingRecords
             );
         }
 
-        // ------------------------------------------------
-        // 4. Flush and clear
-        // ------------------------------------------------
+//        long recordSaveTime =
+//                System.currentTimeMillis();
 
         entityManager.flush();
         entityManager.clear();
+
+//        long end =
+//                System.currentTimeMillis();
+
+//        System.out.println(
+//                "Batch size: " + users.size()
+//                        + " | Entity creation: "
+//                        + (entityCreationTime - start) + " ms"
+//                        + " | User save: "
+//                        + (userSaveTime - entityCreationTime) + " ms"
+//                        + " | Record save: "
+//                        + (recordSaveTime - userSaveTime) + " ms"
+//                        + " | Flush: "
+//                        + (end - recordSaveTime) + " ms"
+//        );
     }
 }

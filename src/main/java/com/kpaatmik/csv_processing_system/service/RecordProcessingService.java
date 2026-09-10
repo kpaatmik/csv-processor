@@ -55,6 +55,7 @@ public class RecordProcessingService {
 
     private final ExecutorService executorService;
     private final EntityManager entityManager;
+    private final AddressCache addressCache;
 
     public void process(
             MultipartFile file,
@@ -138,6 +139,7 @@ public class RecordProcessingService {
                         failureCount
                 );
             }
+            addressCache.printStats();
 
             // ------------------------------------------------
             // 4. Update final job status
@@ -364,7 +366,7 @@ public class RecordProcessingService {
                 Duration.between(
                         job.getStartTime(),
                         endTime
-                ).toMillis();
+                ).toSeconds();
 
         job.setDuration(duration);
 
