@@ -1,6 +1,8 @@
 package com.kpaatmik.csv_processing_system.service;
 
 import com.kpaatmik.csv_processing_system.dto.HeaderMapping;
+import com.kpaatmik.csv_processing_system.exception.AddressResolutionException;
+
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 
@@ -47,8 +49,8 @@ public class RecordValidator {
             );
         }
 
-        if (isBlank(zipCode)) {
-            throw new IllegalArgumentException(
+        if (isBlank(zipCode) || zipCode.length()<5) {
+            throw new AddressResolutionException(
                     "ZIP code is required"
             );
         }

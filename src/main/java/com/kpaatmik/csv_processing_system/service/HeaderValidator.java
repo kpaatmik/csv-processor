@@ -11,6 +11,7 @@ import com.kpaatmik.csv_processing_system.exception.HeaderValidationException;
 public class HeaderValidator {
 
     public HeaderMapping validate(Map<String, Integer> headers) {
+    	System.out.println("im inside validate");
 
         String firstName = findHeader(
                 headers,
@@ -65,7 +66,8 @@ public class HeaderValidator {
         }
 
         // ZIP code is mandatory
-        if (zipCode == null) {
+        if (zipCode.length()<5 || zipCode == null ) {
+        	System.out.println("i'm here");
             throw new HeaderValidationException(
                     "CSV must contain a ZIP code column"
             );
