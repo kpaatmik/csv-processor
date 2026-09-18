@@ -1,9 +1,28 @@
 package com.kpaatmik.csv_processing_system.service;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
 import com.kpaatmik.csv_processing_system.dto.HeaderMapping;
 import com.kpaatmik.csv_processing_system.dto.RecordProcessingResult;
 import com.kpaatmik.csv_processing_system.dto.UserData;
-import com.kpaatmik.csv_processing_system.dto.UserPersistenceItem;
 import com.kpaatmik.csv_processing_system.entity.Address;
 import com.kpaatmik.csv_processing_system.entity.ErrorType;
 import com.kpaatmik.csv_processing_system.entity.JobStatus;
@@ -18,399 +37,262 @@ import com.kpaatmik.csv_processing_system.exception.FileProcessingException;
 import com.kpaatmik.csv_processing_system.exception.RecordValidationException;
 import com.kpaatmik.csv_processing_system.exception.ZipCodeApiException;
 import com.kpaatmik.csv_processing_system.repo.ProcessingJobRepository;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.persistence.EntityManager;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class RecordProcessingService {
 
-    private static final int BATCH_SIZE = 500;
+	private static final int BATCH_SIZE = 500;
 
-    private final CsvParser csvParser;
-    private final HeaderValidator headerValidator;
-    private final RecordValidator recordValidator;
-    private final UserService userService;
-    private final AddressService addressService;
+	private final CsvParser csvParser;
+	private final HeaderValidator headerValidator;
+	private final RecordValidator recordValidator;
+	private final UserService userService;
+	private final AddressService addressService;
 
-    private final BatchPersistenceService batchPersistenceService;
-    private final ProcessingJobRepository processingJobRepository;
+	private final BatchPersistenceService batchPersistenceService;
+	private final ProcessingJobRepository processingJobRepository;
 
-    private final ExecutorService executorService;
-    private final EntityManager entityManager;
-    private final AddressCache addressCache;
+	@Qualifier("recordExecutor")
+	private final ExecutorService executorService;
+	private final EntityManager entityManager;
+	private final AddressCache addressCache;
 
-    public void process(
-            MultipartFile file,
-            ProcessingJob job) {
+	public void process(Path filePath, Long jobId) {
+		ProcessingJob job = processingJobRepository.findById(jobId)
+				.orElseThrow(() -> new FileProcessingException("Processing job not found: " + jobId));
 
-        AtomicInteger totalRecords = new AtomicInteger();
-        AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger failureCount = new AtomicInteger();
+		AtomicInteger totalRecords = new AtomicInteger();
+		AtomicInteger successCount = new AtomicInteger();
+		AtomicInteger failureCount = new AtomicInteger();
 
-        try (
-                Reader reader = new BufferedReader(
-                        new InputStreamReader(
-                                file.getInputStream(),
-                                StandardCharsets.UTF_8
-                        )
-                );
+		try (Reader reader = new BufferedReader(
+				new InputStreamReader(Files.newInputStream(filePath), StandardCharsets.UTF_8));
 
-                CSVParser parser = csvParser.createParser(reader)
-        ) {
+				CSVParser parser = csvParser.createParser(reader)) {
 
-            // ------------------------------------------------
-            // 1. Validate header only once
-            // ------------------------------------------------
+			// ------------------------------------------------
+			// 1. Validate header only once
+			// ------------------------------------------------
 
-            HeaderMapping headerMapping =
-                    headerValidator.validate(
-                            parser.getHeaderMap()
-                    );
+			HeaderMapping headerMapping = headerValidator.validate(parser.getHeaderMap());
 
-            System.out.println(
-                    "CSV header validation successful"
-            );
+			System.out.println("CSV header validation successful");
 
-            // ------------------------------------------------
-            // 2. Process CSV in chunks
-            // ------------------------------------------------
+			// ------------------------------------------------
+			// 2. Process CSV in chunks
+			// ------------------------------------------------
 
-            List<CompletableFuture<RecordProcessingResult>> futures =
-                    new ArrayList<>(BATCH_SIZE);
+			List<CompletableFuture<RecordProcessingResult>> futures = new ArrayList<>(BATCH_SIZE);
 
-            for (CSVRecord record : parser) {
+			for (CSVRecord record : parser) {
 
-                totalRecords.incrementAndGet();
+				totalRecords.incrementAndGet();
 
-                CompletableFuture<RecordProcessingResult> future =
-                        CompletableFuture.supplyAsync(
-                                () -> processRecord(
-                                        record,
-                                        headerMapping,
-                                        job
-                                ),
-                                executorService
-                        );
-                futures.add(future);
+				CompletableFuture<RecordProcessingResult> future = CompletableFuture
+						.supplyAsync(() -> processRecord(record, headerMapping, job), executorService);
+				futures.add(future);
 
-                // ------------------------------------------------
-                // Wait after every 500 records
-                // ------------------------------------------------
+				// ------------------------------------------------
+				// Wait after every 500 records
+				// ------------------------------------------------
 
-                if (futures.size() == BATCH_SIZE) {
+				if (futures.size() == BATCH_SIZE) {
 
-                    processCompletedBatch(
-                            futures,
-                            successCount,
-                            failureCount
-                    );
+					processCompletedBatch(futures, successCount, failureCount);
 
-                    futures.clear();
-                }
-            }
+					futures.clear();
+				}
+			}
 
-            // ------------------------------------------------
-            // 3. Process remaining records
-            // ------------------------------------------------
+			// ------------------------------------------------
+			// 3. Process remaining records
+			// ------------------------------------------------
 
-            if (!futures.isEmpty()) {
+			if (!futures.isEmpty()) {
 
-                processCompletedBatch(
-                        futures,
-                        successCount,
-                        failureCount
-                );
-            }
-            addressCache.printStats();
+				processCompletedBatch(futures, successCount, failureCount);
+			}
+			addressCache.printStats();
 
-            // ------------------------------------------------
-            // 4. Update final job status
-            // ------------------------------------------------
+			// ------------------------------------------------
+			// 4. Update final job status
+			// ------------------------------------------------
 
-            updateJob(
-                    job,
-                    totalRecords.get(),
-                    successCount.get(),
-                    failureCount.get()
-            );
+			updateJob(job, totalRecords.get(), successCount.get(), failureCount.get());
 
-        } catch (ApplicationException e) {
+		} catch (ApplicationException e) {
 
-            throw e;
+			throw e;
 
-        } catch (IOException e) {
+		} catch (IOException e) {
 
-            throw new FileProcessingException(
-                    "Error while reading CSV file",
-                    e
-            );
+			throw new FileProcessingException("Error while reading CSV file", e);
 
-        } catch (Exception e) {
+		} catch (Exception e) {
 
-            throw new FileProcessingException(
-                    "Unexpected error while processing CSV file",
-                    e
-            );
-        }
-    }
+			throw new FileProcessingException("Unexpected error while processing CSV file", e);
+		}
+	}
 
-    /**
-     * Process one batch of futures.
-     *
-     * The workers do validation, address resolution and object creation.
-     * Database batch persistence happens only after all workers complete.
-     */
-    private void processCompletedBatch(
-            List<CompletableFuture<RecordProcessingResult>> futures,
-            AtomicInteger successCount,
-            AtomicInteger failureCount) {
+	/**
+	 * Process one batch of futures.
+	 *
+	 * The workers do validation, address resolution and object creation. Database
+	 * batch persistence happens only after all workers complete.
+	 */
+	private void processCompletedBatch(List<CompletableFuture<RecordProcessingResult>> futures,
+			AtomicInteger successCount, AtomicInteger failureCount) {
 
-        CompletableFuture.allOf(
-                futures.toArray(new CompletableFuture[0])
-        ).join();
+		CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        List<User> usersToSave =
-                new ArrayList<>();
+		List<User> usersToSave = new ArrayList<>();
 
-        List<ProcessingRecord> recordsToSave =
-                new ArrayList<>();
+		List<ProcessingRecord> recordsToSave = new ArrayList<>();
 
-        for (CompletableFuture<RecordProcessingResult> future : futures) {
+		for (CompletableFuture<RecordProcessingResult> future : futures) {
 
-            RecordProcessingResult result = future.join();
+			RecordProcessingResult result = future.join();
 
-           if (result.success()) {
+			if (result.success()) {
 
-                usersToSave.add(
-                        result.userPersistenceItem()
-                );
+				usersToSave.add(result.userPersistenceItem());
 
-                successCount.incrementAndGet();
+				successCount.incrementAndGet();
 
-            } else {
-            	 recordsToSave.add(
-                         result.processingRecord()
-                 );
+			} else {
+				recordsToSave.add(result.processingRecord());
 
-                failureCount.incrementAndGet();
-            }
-        }
+				failureCount.incrementAndGet();
+			}
+		}
 
-        // ------------------------------------------------
-        // Batch persistence
-        // ------------------------------------------------
+		// ------------------------------------------------
+		// Batch persistence
+		// ------------------------------------------------
 
-        batchPersistenceService.saveBatch(
-                usersToSave,
-                recordsToSave
-        );
-    }
+		batchPersistenceService.saveBatch(usersToSave, recordsToSave);
+	}
 
-    /**
-     * Runs in a worker thread.
-     *
-     * Important:
-     * No database save is performed here.
-     */
-    private RecordProcessingResult processRecord(
-            CSVRecord record,
-            HeaderMapping headerMapping,
-            ProcessingJob job) {
+	/**
+	 * Runs in a worker thread.
+	 *
+	 * Important: No database save is performed here.
+	 */
+	private RecordProcessingResult processRecord(CSVRecord record, HeaderMapping headerMapping, ProcessingJob job) {
 
-    	ProcessingRecord processingRecord =
-    	        ProcessingRecord.builder()
-    	                .recordNumber(
-    	                        (int) record.getRecordNumber()
-    	                )
-    	                .status(RecordStatus.PROCESSING)
-    	                .processingJob(job)
-    	                .build();
+		ProcessingRecord processingRecord = ProcessingRecord.builder().recordNumber((int) record.getRecordNumber())
+				.status(RecordStatus.PROCESSING).processingJob(job).build();
 
-        try {
+		try {
 
+			// ------------------------------------------------
+			// 1. Validate record
+			// ------------------------------------------------
 
-            // ------------------------------------------------
-            // 1. Validate record
-            // ------------------------------------------------
+			recordValidator.validate(record, headerMapping);
 
-            recordValidator.validate(
-                    record,
-                    headerMapping
-            );
+			// ------------------------------------------------
+			// 2. Extract user data
+			// ------------------------------------------------
 
-            // ------------------------------------------------
-            // 2. Extract user data
-            // ------------------------------------------------
+			UserData userData = userService.extractUser(record, headerMapping);
 
-            UserData userData =
-                    userService.extractUser(
-                            record,
-                            headerMapping
-                    );
+			// ------------------------------------------------
+			// 3. Resolve address
+			// ------------------------------------------------
 
-            // ------------------------------------------------
-            // 3. Resolve address
-            // ------------------------------------------------
+			Long addressId = addressService.resolveAddressId(userData.zipCode());
 
-            Long addressId =
-                    addressService.resolveAddressId(
-                            userData.zipCode()
-                    );
+			// ------------------------------------------------
+			// 4. Prepare user data
+			// ------------------------------------------------
+			Address address = entityManager.getReference(Address.class, addressId);
+			User user = User.builder().firstName(userData.firstName()).lastName(userData.lastName())
+					.email(userData.email()).phone(userData.phone()).address(address).build();
 
-            // ------------------------------------------------
-            // 4. Prepare user data
-            // ------------------------------------------------
-            Address address =
-                    entityManager.getReference(
-                            Address.class,
-                            addressId
-                    );
-           User user = User.builder()
-            .firstName(userData.firstName())
-            .lastName(userData.lastName())
-            .email(userData.email())
-            .phone(userData.phone())
-            .address(address)
-            .build();
-            
 //            UserPersistenceItem userPersistenceItem =
 //                    new UserPersistenceItem(
 //                            userData,
 //                            addressId
 //                    );
 
-            // ------------------------------------------------
-            // 5. Mark success
-            // ------------------------------------------------
+			// ------------------------------------------------
+			// 5. Mark success
+			// ------------------------------------------------
 
-            processingRecord.setStatus(
-                    RecordStatus.SUCCESS
-            );
+			processingRecord.setStatus(RecordStatus.SUCCESS);
 
-            return new RecordProcessingResult(
-                    true,
-                    user,
-                    null
-            );
+			return new RecordProcessingResult(true, user, null);
 
-        } catch (ApplicationException e) {
+		} catch (ApplicationException e) {
 
-            processingRecord.setStatus(
-                    RecordStatus.FAILED
-            );
+			processingRecord.setStatus(RecordStatus.FAILED);
 
-            processingRecord.setErrorType(
-                    determineErrorType(e)
-            );
+			processingRecord.setErrorType(determineErrorType(e));
 
-            processingRecord.setErrorMessage(
-                    e.getMessage()
-            );
+			processingRecord.setErrorMessage(e.getMessage());
 
-            return new RecordProcessingResult(
-                    false,
-                    null,
-                    processingRecord
-            );
+			return new RecordProcessingResult(false, null, processingRecord);
 
-        } catch (Exception e) {
+		} catch (Exception e) {
 
-            processingRecord.setStatus(
-                    RecordStatus.FAILED
-            );
+			processingRecord.setStatus(RecordStatus.FAILED);
 
-            processingRecord.setErrorType(
-                    ErrorType.UNKNOWN
-            );
+			processingRecord.setErrorType(ErrorType.UNKNOWN);
 
-            processingRecord.setErrorMessage(
-                    "Unexpected error while processing record"
-            );
+			processingRecord.setErrorMessage("Unexpected error while processing record");
 
-            return new RecordProcessingResult(
-                    false,
-                    null,
-                    processingRecord
-            );
-        }
-    }
+			return new RecordProcessingResult(false, null, processingRecord);
+		}
+	}
 
-    private void updateJob(
-            ProcessingJob job,
-            int totalRecords,
-            int successCount,
-            int failureCount) {
+	private void updateJob(ProcessingJob job, int totalRecords, int successCount, int failureCount) {
 
-        LocalDateTime endTime =
-                LocalDateTime.now();
+		LocalDateTime endTime = LocalDateTime.now();
 
-        job.setTotalRecords(totalRecords);
-        job.setSuccessCount(successCount);
-        job.setFailureCount(failureCount);
-        job.setEndTime(endTime);
+		job.setTotalRecords(totalRecords);
+		job.setSuccessCount(successCount);
+		job.setFailureCount(failureCount);
+		job.setEndTime(endTime);
 
-        long duration =
-                Duration.between(
-                        job.getStartTime(),
-                        endTime
-                ).toMillis();
+		long duration = Duration.between(job.getStartTime(), endTime).toMillis();
 
-        job.setDuration(duration);
+		job.setDuration(duration);
 
-        if (failureCount == 0) {
+		if (failureCount == 0) {
 
-            job.setStatus(
-                    JobStatus.COMPLETED
-            );
+			job.setStatus(JobStatus.COMPLETED);
 
-        } else {
+		} else {
 
-            job.setStatus(
-                    JobStatus.COMPLETED_WITH_ERRORS
-            );
-        }
+			job.setStatus(JobStatus.COMPLETED_WITH_ERRORS);
+		}
 
-        processingJobRepository.save(job);
-    }
+		processingJobRepository.save(job);
+	}
 
-    private ErrorType determineErrorType(
-            Exception e) {
+	private ErrorType determineErrorType(Exception e) {
 
-        if (e instanceof RecordValidationException) {
-            return ErrorType.RECORD_VALIDATION;
-        }
+		if (e instanceof RecordValidationException) {
+			return ErrorType.RECORD_VALIDATION;
+		}
 
-        if (e instanceof ZipCodeApiException) {
-            return ErrorType.ZIP_API;
-        }
+		if (e instanceof ZipCodeApiException) {
+			return ErrorType.ZIP_API;
+		}
 
-        if (e instanceof AddressResolutionException) {
-            return ErrorType.ADDRESS_RESOLUTION;
-        }
+		if (e instanceof AddressResolutionException) {
+			return ErrorType.ADDRESS_RESOLUTION;
+		}
 
-        if (e instanceof DataPersistenceException) {
-            return ErrorType.DATABASE;
-        }
+		if (e instanceof DataPersistenceException) {
+			return ErrorType.DATABASE;
+		}
 
-        return ErrorType.UNKNOWN;
-    }
+		return ErrorType.UNKNOWN;
+	}
 }

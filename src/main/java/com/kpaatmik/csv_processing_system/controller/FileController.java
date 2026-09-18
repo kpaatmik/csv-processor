@@ -1,17 +1,13 @@
 package com.kpaatmik.csv_processing_system.controller;
 
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
-import com.kpaatmik.csv_processing_system.entity.ProcessingJob;
+import com.kpaatmik.csv_processing_system.dto.JobResponse;
 import com.kpaatmik.csv_processing_system.service.FileProcessingService;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
@@ -24,16 +20,14 @@ public class FileController {
             value = "/upload",
             consumes = "multipart/form-data"
     )
-    public ResponseEntity<ProcessingJob> uploadFile(
+    public ResponseEntity<JobResponse> uploadFile(
             @RequestParam("file") MultipartFile file) {
 
-        ProcessingJob job =
-                fileProcessingService.processFile(file);
+        Long jobId =
+                fileProcessingService.startProcessing(file);
 
-        return ResponseEntity.ok(job);
-         
+        return ResponseEntity
+                .accepted()
+                .body(new JobResponse(jobId));
     }
 }
-
-
-
