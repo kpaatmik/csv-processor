@@ -24,39 +24,39 @@ public class BatchPersistenceService {
 
     @Transactional
     public void saveBatch(
-            List<UserPersistenceItem> userItems,
+            List<User> userItems,
             List<ProcessingRecord> processingRecords) {
 
 //        long start = System.currentTimeMillis();
 
-        List<User> users =
-                new ArrayList<>(userItems.size());
+//        List<User> users =
+//                new ArrayList<>(userItems.size());
 
-        for (UserPersistenceItem item : userItems) {
-
-            Address address =
-                    entityManager.getReference(
-                            Address.class,
-                            item.addressId()
-                    );
-
-            User user =
-                    User.builder()
-                            .firstName(item.userData().firstName())
-                            .lastName(item.userData().lastName())
-                            .email(item.userData().email())
-                            .phone(item.userData().phone())
-                            .address(address)
-                            .build();
-
-            users.add(user);
-        }
+//        for (UserPersistenceItem item : userItems) {
+//
+//            Address address =
+//                    entityManager.getReference(
+//                            Address.class,
+//                            item.addressId()
+//                    );
+//
+//            User user =
+//                    User.builder()
+//                            .firstName(item.userData().firstName())
+//                            .lastName(item.userData().lastName())
+//                            .email(item.userData().email())
+//                            .phone(item.userData().phone())
+//                            .address(address)
+//                            .build();
+//
+//            users.add(user);
+//        }
 
 //        long entityCreationTime =
 //                System.currentTimeMillis();
 
-        if (!users.isEmpty()) {
-            userRepository.saveAll(users);
+        if (!userItems.isEmpty()) {
+            userRepository.saveAll(userItems);
         }
 
 //        long userSaveTime =

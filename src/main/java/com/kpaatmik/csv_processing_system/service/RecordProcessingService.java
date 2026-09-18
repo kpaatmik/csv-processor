@@ -10,6 +10,7 @@ import com.kpaatmik.csv_processing_system.entity.JobStatus;
 import com.kpaatmik.csv_processing_system.entity.ProcessingJob;
 import com.kpaatmik.csv_processing_system.entity.ProcessingRecord;
 import com.kpaatmik.csv_processing_system.entity.RecordStatus;
+import com.kpaatmik.csv_processing_system.entity.User;
 import com.kpaatmik.csv_processing_system.exception.AddressResolutionException;
 import com.kpaatmik.csv_processing_system.exception.ApplicationException;
 import com.kpaatmik.csv_processing_system.exception.DataPersistenceException;
@@ -187,7 +188,7 @@ public class RecordProcessingService {
                 futures.toArray(new CompletableFuture[0])
         ).join();
 
-        List<UserPersistenceItem> usersToSave =
+        List<User> usersToSave =
                 new ArrayList<>();
 
         List<ProcessingRecord> recordsToSave =
@@ -279,14 +280,24 @@ public class RecordProcessingService {
             // ------------------------------------------------
             // 4. Prepare user data
             // ------------------------------------------------
-
-            
-            
-            UserPersistenceItem userPersistenceItem =
-                    new UserPersistenceItem(
-                            userData,
+            Address address =
+                    entityManager.getReference(
+                            Address.class,
                             addressId
                     );
+           User user = User.builder()
+            .firstName(userData.firstName())
+            .lastName(userData.lastName())
+            .email(userData.email())
+            .phone(userData.phone())
+            .address(address)
+            .build();
+            
+//            UserPersistenceItem userPersistenceItem =
+//                    new UserPersistenceItem(
+//                            userData,
+//                            addressId
+//                    );
 
             // ------------------------------------------------
             // 5. Mark success
@@ -298,7 +309,7 @@ public class RecordProcessingService {
 
             return new RecordProcessingResult(
                     true,
-                    userPersistenceItem,
+                    user,
                     processingRecord
             );
 
