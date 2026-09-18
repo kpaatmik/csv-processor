@@ -247,12 +247,6 @@ public class RecordProcessingService {
 
         try {
 
-//            System.out.println(
-//                    "Processing record "
-//                            + record.getRecordNumber()
-//                            + " on thread "
-//                            + Thread.currentThread().getName()
-//            );
 
             // ------------------------------------------------
             // 1. Validate record
@@ -286,6 +280,8 @@ public class RecordProcessingService {
             // 4. Prepare user data
             // ------------------------------------------------
 
+            
+            
             UserPersistenceItem userPersistenceItem =
                     new UserPersistenceItem(
                             userData,
@@ -366,7 +362,7 @@ public class RecordProcessingService {
                 Duration.between(
                         job.getStartTime(),
                         endTime
-                ).toSeconds();
+                ).toMillis();
 
         job.setDuration(duration);
 

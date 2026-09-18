@@ -17,7 +17,7 @@ public class ZipCodeApiClient {
 
     private final RestClient zipCodeRestClient;
 
-    public AddressData getAddress(String zipCode) {
+	public AddressData getAddress(String zipCode) {
 
         try {
 
