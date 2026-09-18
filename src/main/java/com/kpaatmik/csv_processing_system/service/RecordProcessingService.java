@@ -198,11 +198,7 @@ public class RecordProcessingService {
 
             RecordProcessingResult result = future.join();
 
-            recordsToSave.add(
-                    result.processingRecord()
-            );
-
-            if (result.success()) {
+           if (result.success()) {
 
                 usersToSave.add(
                         result.userPersistenceItem()
@@ -211,6 +207,9 @@ public class RecordProcessingService {
                 successCount.incrementAndGet();
 
             } else {
+            	 recordsToSave.add(
+                         result.processingRecord()
+                 );
 
                 failureCount.incrementAndGet();
             }
@@ -310,7 +309,7 @@ public class RecordProcessingService {
             return new RecordProcessingResult(
                     true,
                     user,
-                    processingRecord
+                    null
             );
 
         } catch (ApplicationException e) {
